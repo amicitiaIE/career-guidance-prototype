@@ -1,4 +1,6 @@
 import streamlit as st
+from ai_analysis import generate_career_analysis, display_ai_analysis
+from caas_assessment import CAAS_QUESTIONS
 
 def get_career_paths(interests, education_level):
     """Generate career path suggestions based on interests and education"""
@@ -176,6 +178,24 @@ def get_resource_recommendations(location, barriers):
     ]
     return general_resources
 
+def calculate_caas_scores():
+    """Calculate scores for each CAAS dimension"""
+    caas_scores = {}
+    
+    for dimension in ["Concern", "Control", "Curiosity", "Confidence"]:
+        dimension_questions = CAAS_QUESTIONS.get(dimension, [])
+        matching_responses = [
+            st.session_state.responses[question]
+            for question in dimension_questions
+            if question in st.session_state.responses
+        ]
+        
+        if matching_responses:
+            score = sum(matching_responses) / len(matching_responses)
+            caas_scores[dimension] = score
+    
+    return caas_scores
+
 def show_career_paths():
     """Display career path recommendations"""
     st.subheader("Recommended Career Paths")
@@ -199,23 +219,7 @@ def show_skill_development():
     st.subheader("Skill Development Recommendations")
     
     # Calculate CAAS dimension scores
-    caas_scores = {}
-    
-    # Get CAAS questions structure
-    from caas_assessment import CAAS_QUESTIONS
-    
-    # Calculate scores for each dimension
-    for dimension in ["Concern", "Control", "Curiosity", "Confidence"]:
-        dimension_questions = CAAS_QUESTIONS.get(dimension, [])
-        matching_responses = [
-            st.session_state.responses[question]
-            for question in dimension_questions
-            if question in st.session_state.responses
-        ]
-        
-        if matching_responses:
-            score = sum(matching_responses) / len(matching_responses)
-            caas_scores[dimension] = score
+    caas_scores = calculate_caas_scores()
     
     if not caas_scores:
         st.warning("No scores could be calculated. Please ensure you've completed the full assessment.")
@@ -257,7 +261,7 @@ def show_resources():
     st.subheader("Resources & Support")
     
     resources = get_resource_recommendations(
-        "local",
+        f"{st.session_state.background_info.get('county', '')}, {st.session_state.background_info.get('postcode_area', '')}",
         st.session_state.background_info['barriers']
     )
     
@@ -294,7 +298,7 @@ def show_recommendations_page():
     """Main recommendations page showing all sections"""
     st.title("Your Personalized Career Guidance")
     
-    # Ensure we have both CAAS results and background info
+    # Ensure we have required data
     if 'responses' not in st.session_state or 'background_info' not in st.session_state:
         st.error("Please complete the assessment and background information first.")
         if st.button("← Return to Assessment"):
@@ -303,13 +307,25 @@ def show_recommendations_page():
         return
     
     # Create tabs for different types of recommendations
-    tabs = st.tabs(["Career Paths", "Skill Development", "Resources & Support"])
+    tabs = st.tabs(["AI Analysis", "Career Paths", "Skill Development", "Resources & Support"])
     
     with tabs[0]:
-        show_career_paths()
+        # Calculate CAAS scores
+        caas_scores = calculate_caas_scores()
+        
+        if not caas_scores:
+            st.error("Unable to calculate CAAS scores. Please complete the assessment first.")
+            return
+            
+        # Generate and display AI analysis
+        analysis = generate_career_analysis(caas_scores, st.session_state.background_info)
+        display_ai_analysis(analysis)
     
     with tabs[1]:
-        show_skill_development()
+        show_career_paths()
     
     with tabs[2]:
+        show_skill_development()
+    
+    with tabs[3]:
         show_resources()
