@@ -27,24 +27,30 @@ def generate_career_analysis(caas_scores, background_info):
     4. Immediate next steps they can take
     5. Long-term development suggestions
 
-    Focus on practical, achievable recommendations that consider their specific circumstances."""
+    Focus on practical, achievable recommendations that consider their specific circumstances.
+    
+    Format your response with clear section headers using markdown formatting (e.g., ### Strengths and Development Areas).
+    """
 
     try:
-        # Use Streamlit secrets for API key
         anthropic = Anthropic(api_key=st.secrets["anthropic"]["api_key"])
         
         response = anthropic.messages.create(
             model="claude-3-sonnet-20240229",
             max_tokens=1500,
             temperature=0.7,
-            system="You are a career guidance expert specializing in supporting people at risk of offending. Provide practical, empathetic guidance.",
+            system="You are a career guidance expert specializing in supporting people at risk of offending. Provide practical, empathetic guidance with clear section headers using markdown.",
             messages=[{
                 "role": "user",
                 "content": prompt
             }]
         )
         
-        return parse_ai_response(response.content)
+        # Extract the content from the response
+        if hasattr(response, 'content') and len(response.content) > 0:
+            return response.content[0].text
+        else:
+            return "Error: Unable to generate analysis"
     
     except Exception as e:
         st.error(f"Error generating AI analysis: {str(e)}")
@@ -58,51 +64,18 @@ def format_caas_scores(scores):
         formatted_scores.append(f"{dimension}: {score}/5.0 ({level})")
     return "\n".join(formatted_scores)
 
-def parse_ai_response(response):
-    """Parse and structure the AI response"""
-    return {
-        'summary': extract_section(response, 'strengths and areas'),
-        'career_recommendations': extract_section(response, 'career recommendations'),
-        'barrier_strategies': extract_section(response, 'strategies'),
-        'next_steps': extract_section(response, 'next steps'),
-        'long_term': extract_section(response, 'long-term')
-    }
-
-def extract_section(response, section_key):
-    """Extract specific sections from the AI response"""
-    # Add logic to parse and extract sections from the response
-    # This would depend on the structure of Claude's response
-    return response
-
 def generate_fallback_analysis(caas_scores, background_info):
     """Generate basic analysis if AI service is unavailable"""
-    # Implement basic rule-based analysis as fallback
-    return {
-        'summary': "Basic analysis based on your assessment scores...",
-        'career_recommendations': "Career suggestions based on your interests...",
-        'barrier_strategies': "General strategies for overcoming barriers...",
-        'next_steps': "Standard next steps...",
-        'long_term': "General long-term suggestions..."
-    }
+    return """### Analysis Currently Unavailable
+
+We apologize, but we're unable to generate a personalized analysis at the moment. 
+Please refer to the Career Paths, Skill Development, and Resources tabs for guidance.
+"""
 
 def display_ai_analysis(analysis):
     """Display the AI analysis in the Streamlit UI"""
-    st.subheader("AI-Powered Career Analysis")
-    
-    with st.expander("Key Strengths & Development Areas", expanded=True):
-        st.write(analysis['summary'])
-    
-    with st.expander("Personalized Career Recommendations"):
-        st.write(analysis['career_recommendations'])
-    
-    with st.expander("Strategies for Success"):
-        st.write(analysis['barrier_strategies'])
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("### Immediate Next Steps")
-        st.write(analysis['next_steps'])
-    
-    with col2:
-        st.markdown("### Long-term Development")
-        st.write(analysis['long_term'])
+    if isinstance(analysis, str) and len(analysis.strip()) > 0:
+        # Convert the string response into formatted markdown
+        st.markdown(analysis)
+    else:
+        st.error("Unable to generate career analysis. Please try again later.")
